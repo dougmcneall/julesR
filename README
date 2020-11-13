@@ -1,0 +1,7 @@
+julesR
+
+An R package for running UQ experiments with the land surface model JULES.
+
+Doug McNeall
+
+install using devtools::install_github('dougmcneall/julesR')
