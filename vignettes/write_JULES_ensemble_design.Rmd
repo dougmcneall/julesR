@@ -1,0 +1,112 @@
+---
+title: "Write a JULES ensemble design"
+author: "Doug McNeall"
+date: "`r Sys.Date()`"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Write a JULES ensemble design}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>"
+)
+```
+
+This vignette shows the creation of a perturbed parameter ensemble design for JULES. It uses a maximin latin hypercube design to create a design of factors, which multiply the standard parameters for JULES. Individual PFTS are all multiplied by the same factor.
+
+On running the code, a folder is created for the configuration file, the latin hypercube, the standard parameters, and allpft standard parameters (these will just be 1s at the moment.)
+
+
+```{r}
+library(julesR)
+# Load a list of parameter perturbations
+source('default_jules_parameter_perturbations.R')
+
+# Easiest way to generate a design of the right size is to have a "fac" which takes
+# the names from the parameter list, and then multiplies everything by 0.5 or 2
+
+tf <- 'l_vg_soil'
+# we don't want anything that is TRUE/FALSE to be in fac
+fac.init <- names(paramlist)
+not_tf.ix <- which(names(paramlist)!=tf)
+paramlist.trunc <-paramlist[not_tf.ix]
+
+fac <- names(paramlist.trunc)
+
+maxfac = lapply(paramlist.trunc,function(x) x$max[which.max(x$max)] / x$standard[which.max(x$max)])
+minfac = lapply(paramlist.trunc,function(x) x$min[which.max(x$max)] / x$standard[which.max(x$max)])
+
+dir.create('conf_files_example')
+
+write_jules_design(paramlist, n = 100,
+                    fac = fac, minfac = minfac, maxfac = maxfac,
+                    tf = tf,
+                    fnprefix = 'conf_files_example/param-perturb-P',
+                    lhsfn = 'conf_files_example/lhs_example.txt',
+                    stanfn = 'conf_files_example/stanparms_example.txt',
+                    allstanfn = 'conf_files_example/allstanparms_example.txt',
+                    rn = 12,
+                    startnum = 0)
+
+print(cbind(minfac, maxfac))
+
+
+# Checking section
+lapply(paramlist, function(x) length(x$standard))
+lapply(paramlist, function(x) length(x$standard)==length(x$min) & length(x$standard)==length(x$max))
+
+```
+
+
+
+Vignettes are long form documentation commonly included in packages. Because they are part of the distribution of the package, they need to be as compact as possible. The `html_vignette` output type provides a custom style sheet (and tweaks some options) to ensure that the resulting html is as small as possible. The `html_vignette` format:
+
+- Never uses retina figures
+- Has a smaller default figure size
+- Uses a custom CSS stylesheet instead of the default Twitter Bootstrap style
+
+## Vignette Info
+
+Note the various macros within the `vignette` section of the metadata block above. These are required in order to instruct R how to build the vignette. Note that you should change the `title` field and the `\VignetteIndexEntry` to match the title of your vignette.
+
+## Styles
+
+The `html_vignette` template includes a basic CSS theme. To override this theme you can specify your own CSS in the document metadata as follows:
+
+    output: 
+      rmarkdown::html_vignette:
+        css: mystyles.css
+
+## Figures
+
+The figure sizes have been customised so that you can easily put two images side-by-side. 
+
+```{r, fig.show='hold'}
+plot(1:10)
+plot(10:1)
+```
+
+You can enable figure captions by `fig_caption: yes` in YAML:
+
+    output:
+      rmarkdown::html_vignette:
+        fig_caption: yes
+
+Then you can use the chunk option `fig.cap = "Your figure caption."` in **knitr**.
+
+## More Examples
+
+You can write math expressions, e.g. $Y = X\beta + \epsilon$, footnotes^[A footnote here.], and tables, e.g. using `knitr::kable()`.
+
+```{r, echo=FALSE, results='asis'}
+knitr::kable(head(mtcars, 10))
+```
+
+Also a quote using `>`:
+
+> "He who gives up [code] safety for [code] speed deserves neither."
+([via](https://twitter.com/hadleywickham/status/504368538874703872))

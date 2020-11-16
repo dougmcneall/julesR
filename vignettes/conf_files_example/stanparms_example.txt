@@ -1,0 +1,2 @@
+alpha_io a_wl_io bio_hum_cn b_wl_io dcatch_dlai_io dqcrit_io dz0v_dh_io f0_io fd_io g_area_io g_root_io g_wood_io gs_nvg_io hw_sw_io kaps_roth knl_io lai_max_io lai_min_io lma_io n_inorg_turnover nmass_io nr_io retran_l_io retran_r_io r_grow_io rootd_ft_io sigl_io sorp tleaf_of_io tlow_io tupp_io l_vg_soil
+1       1       1       1       1       1       1       1       1       1       1       1       1       1       1       1       1       1       1       1       1       1       1       1       1       1       1       1       1       1       1       .false.
