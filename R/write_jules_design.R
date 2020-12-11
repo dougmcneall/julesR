@@ -20,8 +20,7 @@
 #' @export
 #'
 #'
-#' @import emtools lhs
-#' @examples
+#' @import emtools lhs MASS
 write_jules_design <- function(paramlist, n, fac, minfac, maxfac, tf, fnprefix = 'param-perturb-test',
                                lhsfn = 'lhs.txt',stanfn = 'stanparms.txt', allstanfn = 'allstanparms.txt', rn = 5, startnum=0){
   # This code writes a design taking either a 'factor', min and max by which
