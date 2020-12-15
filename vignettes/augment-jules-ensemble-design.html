@@ -10,9 +10,7 @@
 
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 
-<meta name="author" content="Doug McNeall" />
 
-<meta name="date" content="2020-12-14" />
 
 <title>Augment JULES ensemble design</title>
 
@@ -300,42 +298,47 @@ code > span.er { color: #a61717; background-color: #e3d2d2; }
 
 
 <h1 class="title toc-ignore">Augment JULES ensemble design</h1>
-<h4 class="author">Doug McNeall</h4>
-<h4 class="date">2020-12-14</h4>
 
 
 
-<p>The purpose of this vignette is to augment an ensemble of JULES with new ensemble members, with input parameter configurations where we think the model output will fall within a set of constraints. The code will write a new set of configuration files.</p>
+<p>The purpose of this vignette is to augment an ensemble of JULES with new ensemble members, with input parameter configurations where we think the model output will fall within a set of constraints. The code writes a new set of configuration files.</p>
 <div class="sourceCode" id="cb1"><pre class="sourceCode r"><code class="sourceCode r"><a class="sourceLine" id="cb1-1" data-line-number="1"></a>
-<a class="sourceLine" id="cb1-2" data-line-number="2"><span class="kw">library</span>(julesR)</a>
-<a class="sourceLine" id="cb1-3" data-line-number="3"><span class="kw">library</span>(emtools)</a>
-<a class="sourceLine" id="cb1-4" data-line-number="4"><span class="kw">library</span>(imptools)</a>
-<a class="sourceLine" id="cb1-5" data-line-number="5"><span class="kw">library</span>(viztools)</a></code></pre></div>
+<a class="sourceLine" id="cb1-2" data-line-number="2"><span class="kw">library</span>(DiceKriging)</a>
+<a class="sourceLine" id="cb1-3" data-line-number="3"><span class="kw">library</span>(julesR)</a>
+<a class="sourceLine" id="cb1-4" data-line-number="4"><span class="kw">library</span>(emtools)</a>
+<a class="sourceLine" id="cb1-5" data-line-number="5"><span class="kw">library</span>(imptools)</a>
+<a class="sourceLine" id="cb1-6" data-line-number="6"><span class="kw">library</span>(viztools)</a></code></pre></div>
+<div id="setup" class="section level2">
+<h2>Setup</h2>
+<p>Read data, set up some constants.</p>
 <div class="sourceCode" id="cb2"><pre class="sourceCode r"><code class="sourceCode r"><a class="sourceLine" id="cb2-1" data-line-number="1">years =<span class="st"> </span><span class="dv">1861</span><span class="op">:</span><span class="dv">2014</span></a>
 <a class="sourceLine" id="cb2-2" data-line-number="2">ysec =<span class="st"> </span><span class="dv">60</span><span class="op">*</span><span class="dv">60</span><span class="op">*</span><span class="dv">24</span><span class="op">*</span><span class="dv">365</span></a>
-<a class="sourceLine" id="cb2-3" data-line-number="3">norm_vec =<span class="st"> </span><span class="kw">c</span>(<span class="fl">1e12</span>, <span class="fl">1e12</span>, <span class="fl">1e12</span><span class="op">/</span>ysec , <span class="fl">1e12</span>, <span class="fl">1e12</span>, <span class="fl">1e9</span>)</a>
-<a class="sourceLine" id="cb2-4" data-line-number="4"> </a>
-<a class="sourceLine" id="cb2-5" data-line-number="5"><span class="co"># Load up the data</span></a>
-<a class="sourceLine" id="cb2-6" data-line-number="6"><span class="co"># system.file find the specified file in package julesR</span></a>
-<a class="sourceLine" id="cb2-7" data-line-number="7">lhs_i =<span class="st"> </span><span class="kw">read.table</span>(<span class="kw">system.file</span>(<span class="st">'extdata/lhs_u-ao732.txt'</span>, <span class="dt">package =</span> <span class="st">'julesR'</span>), <span class="dt">header =</span> <span class="ot">TRUE</span>)</a>
-<a class="sourceLine" id="cb2-8" data-line-number="8">lhs_ii =<span class="st"> </span><span class="kw">read.table</span>(<span class="kw">system.file</span>(<span class="st">'extdata/lhs_u-ao732.txt'</span>, <span class="dt">package =</span> <span class="st">'julesR'</span>), <span class="dt">header =</span> <span class="ot">TRUE</span>)</a>
-<a class="sourceLine" id="cb2-9" data-line-number="9"> </a>
-<a class="sourceLine" id="cb2-10" data-line-number="10">toplevel_ix =<span class="st"> </span><span class="dv">1</span><span class="op">:</span><span class="dv">499</span></a>
-<a class="sourceLine" id="cb2-11" data-line-number="11"> </a>
-<a class="sourceLine" id="cb2-12" data-line-number="12">lhs =<span class="st"> </span><span class="kw">rbind</span>(lhs_i, lhs_ii)[toplevel_ix, ]</a>
-<a class="sourceLine" id="cb2-13" data-line-number="13"> </a>
-<a class="sourceLine" id="cb2-14" data-line-number="14">X =<span class="st"> </span><span class="kw">normalize</span>(lhs)</a>
-<a class="sourceLine" id="cb2-15" data-line-number="15"><span class="kw">colnames</span>(X) =<span class="st"> </span><span class="kw">colnames</span>(lhs)</a>
-<a class="sourceLine" id="cb2-16" data-line-number="16">d =<span class="st"> </span><span class="kw">ncol</span>(X)</a>
-<a class="sourceLine" id="cb2-17" data-line-number="17"></a>
+<a class="sourceLine" id="cb2-3" data-line-number="3"><span class="co"># This is a &quot;normalisation vector&quot;, for making the output numbers more manageable.</span></a>
+<a class="sourceLine" id="cb2-4" data-line-number="4">norm_vec =<span class="st"> </span><span class="kw">c</span>(<span class="fl">1e12</span>, <span class="fl">1e12</span>, <span class="fl">1e12</span><span class="op">/</span>ysec , <span class="fl">1e12</span>, <span class="fl">1e12</span>, <span class="fl">1e9</span>)</a>
+<a class="sourceLine" id="cb2-5" data-line-number="5"> </a>
+<a class="sourceLine" id="cb2-6" data-line-number="6"><span class="co"># Load up the data</span></a>
+<a class="sourceLine" id="cb2-7" data-line-number="7"><span class="co"># system.file find the specified file in package julesR</span></a>
+<a class="sourceLine" id="cb2-8" data-line-number="8">lhs_i =<span class="st"> </span><span class="kw">read.table</span>(<span class="kw">system.file</span>(<span class="st">'extdata/lhs_u-ao732.txt'</span>, <span class="dt">package =</span> <span class="st">'julesR'</span>), <span class="dt">header =</span> <span class="ot">TRUE</span>)</a>
+<a class="sourceLine" id="cb2-9" data-line-number="9">lhs_ii =<span class="st"> </span><span class="kw">read.table</span>(<span class="kw">system.file</span>(<span class="st">'extdata/lhs_u-ao732a.txt'</span>, <span class="dt">package =</span> <span class="st">'julesR'</span>), <span class="dt">header =</span> <span class="ot">TRUE</span>)</a>
+<a class="sourceLine" id="cb2-10" data-line-number="10"> </a>
+<a class="sourceLine" id="cb2-11" data-line-number="11">toplevel_ix =<span class="st"> </span><span class="dv">1</span><span class="op">:</span><span class="dv">499</span></a>
+<a class="sourceLine" id="cb2-12" data-line-number="12"> </a>
+<a class="sourceLine" id="cb2-13" data-line-number="13">lhs =<span class="st"> </span><span class="kw">rbind</span>(lhs_i, lhs_ii)[toplevel_ix, ]</a>
+<a class="sourceLine" id="cb2-14" data-line-number="14"> </a>
+<a class="sourceLine" id="cb2-15" data-line-number="15">X =<span class="st"> </span><span class="kw">normalize</span>(lhs)</a>
+<a class="sourceLine" id="cb2-16" data-line-number="16"><span class="kw">colnames</span>(X) =<span class="st"> </span><span class="kw">colnames</span>(lhs)</a>
+<a class="sourceLine" id="cb2-17" data-line-number="17">d =<span class="st"> </span><span class="kw">ncol</span>(X)</a>
 <a class="sourceLine" id="cb2-18" data-line-number="18"></a>
-<a class="sourceLine" id="cb2-19" data-line-number="19"><span class="co">#dat &lt;- read.csv(system.file('extdata/es_ppe_ii_annual_global_sum.csv', package = 'julesR'), header = TRUE)</span></a>
-<a class="sourceLine" id="cb2-20" data-line-number="20">dat &lt;-<span class="st"> </span><span class="kw">read.csv</span>(<span class="dt">file =</span> <span class="st">'~/myRpackages/julesR/inst/extdata/es_ppe_ii_annual_global_sum.csv'</span>, <span class="dt">header =</span> <span class="ot">TRUE</span>)</a>
-<a class="sourceLine" id="cb2-21" data-line-number="21"></a>
-<a class="sourceLine" id="cb2-22" data-line-number="22">Y &lt;-<span class="st"> </span><span class="kw">sweep</span>(dat, <span class="dv">2</span>, norm_vec, <span class="dt">FUN =</span> <span class="st">'/'</span>)</a></code></pre></div>
+<a class="sourceLine" id="cb2-19" data-line-number="19"></a>
+<a class="sourceLine" id="cb2-20" data-line-number="20"><span class="co">#dat &lt;- read.csv(system.file('extdata/es_ppe_ii_annual_global_sum.csv', package = 'julesR'), header = TRUE)</span></a>
+<a class="sourceLine" id="cb2-21" data-line-number="21">dat &lt;-<span class="st"> </span><span class="kw">read.csv</span>(<span class="dt">file =</span> <span class="st">'~/myRpackages/julesR/inst/extdata/es_ppe_ii_annual_global_sum.csv'</span>, <span class="dt">header =</span> <span class="ot">TRUE</span>)</a>
+<a class="sourceLine" id="cb2-22" data-line-number="22"></a>
+<a class="sourceLine" id="cb2-23" data-line-number="23">Y &lt;-<span class="st"> </span><span class="kw">sweep</span>(dat, <span class="dv">2</span>, norm_vec, <span class="dt">FUN =</span> <span class="st">'/'</span>)</a>
+<a class="sourceLine" id="cb2-24" data-line-number="24">p &lt;-<span class="st"> </span><span class="kw">ncol</span>(Y)</a></code></pre></div>
+</div>
 <div id="level-0-constraint" class="section level2">
 <h2>Level 0 constraint</h2>
-<p>The model is required to run, and have some sort of functioning carbon cycle.</p>
+<p>The model is required to run, and have some sort of functioning carbon cycle. This sets runoff to greater than 0.5 Sv and nbp not too negative.</p>
 <div class="sourceCode" id="cb3"><pre class="sourceCode r"><code class="sourceCode r"><a class="sourceLine" id="cb3-1" data-line-number="1"></a>
 <a class="sourceLine" id="cb3-2" data-line-number="2">allix =<span class="st"> </span><span class="dv">1</span><span class="op">:</span>(<span class="kw">nrow</span>(Y)) <span class="co"># this could be replaced with toplevel_ix above</span></a>
 <a class="sourceLine" id="cb3-3" data-line-number="3"></a>
@@ -358,6 +361,7 @@ code > span.er { color: #a61717; background-color: #e3d2d2; }
 <a class="sourceLine" id="cb3-20" data-line-number="20"></a>
 <a class="sourceLine" id="cb3-21" data-line-number="21"><span class="kw">dim</span>(Y_level0)</a>
 <a class="sourceLine" id="cb3-22" data-line-number="22"><span class="co">#&gt; [1] 393   6</span></a></code></pre></div>
+<p>There are 393 out of 499 members remaining that aren’t ruled out.</p>
 </div>
 <div id="level-1-constraint" class="section level2">
 <h2>Level 1 constraint</h2>
@@ -384,6 +388,100 @@ code > span.er { color: #a61717; background-color: #e3d2d2; }
 <a class="sourceLine" id="cb4-20" data-line-number="20"></a>
 <a class="sourceLine" id="cb4-21" data-line-number="21"><span class="kw">dim</span>(Y_level1)</a>
 <a class="sourceLine" id="cb4-22" data-line-number="22"><span class="co">#&gt; [1] 53  6</span></a></code></pre></div>
+<p>Only 53 members remain with these.</p>
+</div>
+<div id="setup-history-matching-limits" class="section level2">
+<h2>Setup history matching limits</h2>
+<div class="sourceCode" id="cb5"><pre class="sourceCode r"><code class="sourceCode r"><a class="sourceLine" id="cb5-1" data-line-number="1"><span class="co"># In order to use the history matching code, we'll need to specify targets -</span></a>
+<a class="sourceLine" id="cb5-2" data-line-number="2"><span class="co"># specifically &quot;observations&quot; with uncertainty thatapproximately match our</span></a>
+<a class="sourceLine" id="cb5-3" data-line-number="3"><span class="co"># &quot;hard boundaries&quot; from the existing constraints.</span></a>
+<a class="sourceLine" id="cb5-4" data-line-number="4"></a>
+<a class="sourceLine" id="cb5-5" data-line-number="5"><span class="co"># Initial guess just choose the centre of the (implied) uniform distribution.</span></a>
+<a class="sourceLine" id="cb5-6" data-line-number="6"><span class="co">#cs_gb.target = (3000 - 750) / 2</span></a>
+<a class="sourceLine" id="cb5-7" data-line-number="7"><span class="co">#cv.target = (800 - 300) / 2</span></a>
+<a class="sourceLine" id="cb5-8" data-line-number="8"><span class="co">#npp_n_gb.target = (80 - 35) / 2</span></a>
+<a class="sourceLine" id="cb5-9" data-line-number="9"><span class="co">#runoff.target = 1</span></a>
+<a class="sourceLine" id="cb5-10" data-line-number="10"><span class="co">#nbp.target = 0</span></a>
+<a class="sourceLine" id="cb5-11" data-line-number="11"><span class="co">#gpp.target = 75</span></a>
+<a class="sourceLine" id="cb5-12" data-line-number="12"></a>
+<a class="sourceLine" id="cb5-13" data-line-number="13"><span class="co">#Y.target = c(cs_gb.target, cv.target, npp_n_gb.target, runoff.target, nbp.target)</span></a>
+<a class="sourceLine" id="cb5-14" data-line-number="14"></a>
+<a class="sourceLine" id="cb5-15" data-line-number="15"><span class="co"># I'm going to set it so that +3sd aligns approximately with the original limits</span></a>
+<a class="sourceLine" id="cb5-16" data-line-number="16"><span class="co"># given by Andy Wiltshire.</span></a>
+<a class="sourceLine" id="cb5-17" data-line-number="17"><span class="co">#cs_gb       cv    gpp_gb        nbp npp_n_gb    runoff</span></a>
+<a class="sourceLine" id="cb5-18" data-line-number="18">Y_lower =<span class="st"> </span><span class="kw">c</span>(<span class="dv">750</span>, <span class="dv">300</span>, <span class="dv">50</span>, <span class="dv">-10</span>, <span class="dv">35</span>, <span class="fl">0.5</span>)</a>
+<a class="sourceLine" id="cb5-19" data-line-number="19">Y_upper =<span class="st"> </span><span class="kw">c</span>(<span class="dv">3000</span>, <span class="dv">800</span>,<span class="dv">200</span>, <span class="dv">10</span>, <span class="dv">80</span>, <span class="fl">1.5</span>)</a>
+<a class="sourceLine" id="cb5-20" data-line-number="20">Y_target =<span class="st"> </span>(Y_upper <span class="op">-</span><span class="st"> </span><span class="kw">abs</span>(Y_lower)) <span class="op">/</span><span class="st"> </span><span class="dv">2</span> <span class="co"># abs() to fix the problem with negative numbers</span></a>
+<a class="sourceLine" id="cb5-21" data-line-number="21"></a>
+<a class="sourceLine" id="cb5-22" data-line-number="22"></a>
+<a class="sourceLine" id="cb5-23" data-line-number="23"><span class="co"># standard deviation is derived from the limits and the central target</span></a>
+<a class="sourceLine" id="cb5-24" data-line-number="24"><span class="co"># (this distance is assumed to be 3 standard deviations.</span></a>
+<a class="sourceLine" id="cb5-25" data-line-number="25">Y_sd =<span class="st"> </span>(Y_upper <span class="op">-</span><span class="st"> </span>Y_target) <span class="op">/</span><span class="st"> </span><span class="dv">3</span></a>
+<a class="sourceLine" id="cb5-26" data-line-number="26"><span class="kw">names</span>(Y_sd) =<span class="st"> </span><span class="kw">colnames</span>(Y)</a>
+<a class="sourceLine" id="cb5-27" data-line-number="27"></a>
+<a class="sourceLine" id="cb5-28" data-line-number="28">obs_sd_list =<span class="st"> </span><span class="kw">as.list</span>(<span class="kw">rep</span>(<span class="fl">0.01</span>,p))</a>
+<a class="sourceLine" id="cb5-29" data-line-number="29">disc_list =<span class="st">  </span><span class="kw">as.list</span>(<span class="kw">rep</span>(<span class="dv">0</span>,p)) </a>
+<a class="sourceLine" id="cb5-30" data-line-number="30">disc_sd_list =<span class="st">  </span><span class="kw">as.list</span>(Y_sd<span class="op">/</span><span class="dv">2</span>)</a>
+<a class="sourceLine" id="cb5-31" data-line-number="31">thres =<span class="st"> </span><span class="dv">3</span></a>
+<a class="sourceLine" id="cb5-32" data-line-number="32"></a>
+<a class="sourceLine" id="cb5-33" data-line-number="33">mins_aug =<span class="st"> </span><span class="kw">apply</span>(X_level1, <span class="dv">2</span>, <span class="dt">FUN =</span> min)</a>
+<a class="sourceLine" id="cb5-34" data-line-number="34">maxes_aug =<span class="kw">apply</span>(X_level1, <span class="dv">2</span>, <span class="dt">FUN =</span> max)</a>
+<a class="sourceLine" id="cb5-35" data-line-number="35"></a>
+<a class="sourceLine" id="cb5-36" data-line-number="36"><span class="co"># convert Y_target for ingestion into function</span></a>
+<a class="sourceLine" id="cb5-37" data-line-number="37">Y_target =<span class="st"> </span><span class="kw">matrix</span>(Y_target, <span class="dt">nrow =</span> <span class="dv">1</span>)</a></code></pre></div>
+</div>
+<div id="augment-the-design." class="section level2">
+<h2>Augment the design.</h2>
+<p>Choose a space-filling set of points that are Not Ruled Out Yet (NROY) according to the emulator.</p>
+<div class="sourceCode" id="cb6"><pre class="sourceCode r"><code class="sourceCode r"><a class="sourceLine" id="cb6-1" data-line-number="1"><span class="co"># Final output needs to be expressed in terms of original LHS, then put back out to conf files.</span></a>
+<a class="sourceLine" id="cb6-2" data-line-number="2"></a>
+<a class="sourceLine" id="cb6-3" data-line-number="3"><span class="co"># This function adds n.aug potential design points, and finds their implausibility</span></a>
+<a class="sourceLine" id="cb6-4" data-line-number="4"><span class="co"># score in X.nroy</span></a>
+<a class="sourceLine" id="cb6-5" data-line-number="5"></a>
+<a class="sourceLine" id="cb6-6" data-line-number="6">wave1 =<span class="st"> </span><span class="kw">addNroyDesignPoints</span>(<span class="dt">X =</span> X_level1, </a>
+<a class="sourceLine" id="cb6-7" data-line-number="7">                            <span class="dt">Y =</span> Y_level1, </a>
+<a class="sourceLine" id="cb6-8" data-line-number="8">                            <span class="dt">Y_target =</span> Y_target,</a>
+<a class="sourceLine" id="cb6-9" data-line-number="9">                            <span class="dt">n_aug =</span> <span class="dv">10000</span>, </a>
+<a class="sourceLine" id="cb6-10" data-line-number="10">                            <span class="dt">mins_aug =</span> mins_aug,</a>
+<a class="sourceLine" id="cb6-11" data-line-number="11">                            <span class="dt">maxes_aug =</span> maxes_aug,</a>
+<a class="sourceLine" id="cb6-12" data-line-number="12">                            <span class="dt">thres =</span> <span class="dv">3</span>,</a>
+<a class="sourceLine" id="cb6-13" data-line-number="13">                            <span class="dt">disc_list=</span>disc_list,</a>
+<a class="sourceLine" id="cb6-14" data-line-number="14">                            <span class="dt">disc_sd_list =</span> disc_sd_list,</a>
+<a class="sourceLine" id="cb6-15" data-line-number="15">                            <span class="dt">obs_sd_list =</span> obs_sd_list,</a>
+<a class="sourceLine" id="cb6-16" data-line-number="16">                            <span class="dt">n_app =</span> <span class="dv">20</span>,</a>
+<a class="sourceLine" id="cb6-17" data-line-number="17">                            <span class="dt">nreps =</span> <span class="dv">100</span>)</a></code></pre></div>
+<div class="sourceCode" id="cb7"><pre class="sourceCode r"><code class="sourceCode r"><a class="sourceLine" id="cb7-1" data-line-number="1"><span class="kw">source</span>(<span class="st">'default_jules_parameter_perturbations.R'</span>)</a>
+<a class="sourceLine" id="cb7-2" data-line-number="2"></a>
+<a class="sourceLine" id="cb7-3" data-line-number="3"><span class="co"># Easiest way to generate a design of the right size is to have a &quot;fac&quot; which takes</span></a>
+<a class="sourceLine" id="cb7-4" data-line-number="4"><span class="co"># the names from the parameter list, and then multiplies everything by 0.5 or 2</span></a>
+<a class="sourceLine" id="cb7-5" data-line-number="5"></a>
+<a class="sourceLine" id="cb7-6" data-line-number="6">tf &lt;-<span class="st"> 'l_vg_soil'</span></a>
+<a class="sourceLine" id="cb7-7" data-line-number="7"><span class="co"># we don't want anything that is TRUE/FALSE to be in fac</span></a>
+<a class="sourceLine" id="cb7-8" data-line-number="8">fac.init &lt;-<span class="st"> </span><span class="kw">names</span>(paramlist)</a>
+<a class="sourceLine" id="cb7-9" data-line-number="9">not_tf.ix &lt;-<span class="st"> </span><span class="kw">which</span>(<span class="kw">names</span>(paramlist)<span class="op">!=</span>tf)</a>
+<a class="sourceLine" id="cb7-10" data-line-number="10">paramlist.trunc &lt;-paramlist[not_tf.ix]</a>
+<a class="sourceLine" id="cb7-11" data-line-number="11"></a>
+<a class="sourceLine" id="cb7-12" data-line-number="12">fac &lt;-<span class="st"> </span><span class="kw">names</span>(paramlist.trunc)</a>
+<a class="sourceLine" id="cb7-13" data-line-number="13"></a>
+<a class="sourceLine" id="cb7-14" data-line-number="14">maxfac &lt;-<span class="kw">lapply</span>(paramlist.trunc,<span class="cf">function</span>(x) x<span class="op">$</span>max[<span class="kw">which.max</span>(x<span class="op">$</span>max)] <span class="op">/</span><span class="st"> </span>x<span class="op">$</span>standard[<span class="kw">which.max</span>(x<span class="op">$</span>max)])</a>
+<a class="sourceLine" id="cb7-15" data-line-number="15">minfac &lt;-<span class="st"> </span><span class="kw">lapply</span>(paramlist.trunc,<span class="cf">function</span>(x) x<span class="op">$</span>min[<span class="kw">which.max</span>(x<span class="op">$</span>max)] <span class="op">/</span><span class="st"> </span>x<span class="op">$</span>standard[<span class="kw">which.max</span>(x<span class="op">$</span>max)])</a></code></pre></div>
+<div class="sourceCode" id="cb8"><pre class="sourceCode r"><code class="sourceCode r"><a class="sourceLine" id="cb8-1" data-line-number="1"><span class="co"># create a directory for the configuration files</span></a>
+<a class="sourceLine" id="cb8-2" data-line-number="2">confdir &lt;-<span class="st"> 'conf_files_augment'</span></a>
+<a class="sourceLine" id="cb8-3" data-line-number="3"></a>
+<a class="sourceLine" id="cb8-4" data-line-number="4"><span class="kw">dir.create</span>(confdir)</a>
+<a class="sourceLine" id="cb8-5" data-line-number="5"></a>
+<a class="sourceLine" id="cb8-6" data-line-number="6">X_mm =<span class="st"> </span>wave1<span class="op">$</span>X_mm</a>
+<a class="sourceLine" id="cb8-7" data-line-number="7"></a>
+<a class="sourceLine" id="cb8-8" data-line-number="8"><span class="co"># This is the function that writes the configuration files.</span></a>
+<a class="sourceLine" id="cb8-9" data-line-number="9"><span class="kw">write_jules_design</span>(<span class="dt">X_mm =</span> X_mm, <span class="dt">paramlist=</span>paramlist, <span class="dt">n =</span> <span class="kw">nrow</span>(X_mm),</a>
+<a class="sourceLine" id="cb8-10" data-line-number="10">                    <span class="dt">fac =</span> fac, <span class="dt">minfac =</span> minfac, <span class="dt">maxfac =</span> maxfac,</a>
+<a class="sourceLine" id="cb8-11" data-line-number="11">                    <span class="dt">tf =</span> tf,</a>
+<a class="sourceLine" id="cb8-12" data-line-number="12">                    <span class="dt">fnprefix =</span> <span class="kw">paste0</span>(confdir,<span class="st">'/param-perturb-P'</span>),</a>
+<a class="sourceLine" id="cb8-13" data-line-number="13">                    <span class="dt">lhsfn =</span> <span class="kw">paste0</span>(confdir,<span class="st">'/lhs_example.txt'</span>),</a>
+<a class="sourceLine" id="cb8-14" data-line-number="14">                    <span class="dt">stanfn =</span> <span class="kw">paste0</span>(confdir,<span class="st">'/stanparms_example.txt'</span>),</a>
+<a class="sourceLine" id="cb8-15" data-line-number="15">                    <span class="dt">allstanfn =</span> <span class="kw">paste0</span>(confdir,<span class="st">'/allstanparms_example.txt'</span>),</a>
+<a class="sourceLine" id="cb8-16" data-line-number="16">                    <span class="dt">rn =</span> <span class="dv">12</span>,</a>
+<a class="sourceLine" id="cb8-17" data-line-number="17">                    <span class="dt">startnum =</span> <span class="dv">100</span>)</a></code></pre></div>
 <p>Many of the ensemble members are removed under this constraint, with only around 10% remaining.</p>
 <p>Vignettes are long form documentation commonly included in packages. Because they are part of the distribution of the package, they need to be as compact as possible. The <code>html_vignette</code> output type provides a custom style sheet (and tweaks some options) to ensure that the resulting html is as small as possible. The <code>html_vignette</code> format:</p>
 <ul>
@@ -406,8 +504,8 @@ code > span.er { color: #a61717; background-color: #e3d2d2; }
 <div id="figures" class="section level2">
 <h2>Figures</h2>
 <p>The figure sizes have been customised so that you can easily put two images side-by-side.</p>
-<div class="sourceCode" id="cb6"><pre class="sourceCode r"><code class="sourceCode r"><a class="sourceLine" id="cb6-1" data-line-number="1"><span class="kw">plot</span>(<span class="dv">1</span><span class="op">:</span><span class="dv">10</span>)</a>
-<a class="sourceLine" id="cb6-2" data-line-number="2"><span class="kw">plot</span>(<span class="dv">10</span><span class="op">:</span><span class="dv">1</span>)</a></code></pre></div>
+<div class="sourceCode" id="cb10"><pre class="sourceCode r"><code class="sourceCode r"><a class="sourceLine" id="cb10-1" data-line-number="1"><span class="kw">plot</span>(<span class="dv">1</span><span class="op">:</span><span class="dv">10</span>)</a>
+<a class="sourceLine" id="cb10-2" data-line-number="2"><span class="kw">plot</span>(<span class="dv">10</span><span class="op">:</span><span class="dv">1</span>)</a></code></pre></div>
 <p><img src="data:image/png;base64,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" /><img src="data:image/png;base64,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" /></p>
 <p>You can enable figure captions by <code>fig_caption: yes</code> in YAML:</p>
 <pre><code>output:

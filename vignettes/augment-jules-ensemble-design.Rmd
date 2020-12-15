@@ -14,7 +14,7 @@ knitr::opts_chunk$set(
 )
 ```
 
-The purpose of this vignette is to augment an ensemble of JULES with new ensemble members, with input parameter configurations where we think the model output will fall within a set of constraints. The code will write a new set of configuration files.
+The purpose of this vignette is to augment an ensemble of JULES with new ensemble members, with input parameter configurations where we think the model output will fall within a set of constraints. The code writes a new set of configuration files.
 
 ```{r}
 
@@ -24,14 +24,15 @@ library(emtools)
 library(imptools)
 library(viztools)
 
-
 ```
 
-
+## Setup
+Read data, set up some constants.
 
 ```{r}
 years = 1861:2014
 ysec = 60*60*24*365
+# This is a "normalisation vector", for making the output numbers more manageable.
 norm_vec = c(1e12, 1e12, 1e12/ysec , 1e12, 1e12, 1e9)
  
 # Load up the data
@@ -58,7 +59,7 @@ p <- ncol(Y)
 
 ## Level 0 constraint
 
-The model is required to run, and have some sort of functioning carbon cycle.
+The model is required to run, and have some sort of functioning carbon cycle. This sets runoff to greater than 0.5 Sv and nbp not too negative.
 
 ```{r, level 0 constraint}
 
@@ -83,7 +84,7 @@ lhs_na = lhs[na_ix, ]
 
 dim(Y_level0)
 ```
-
+There are 393 out of 499 members remaining that aren't ruled out.
 
 ## Level 1 constraint
 
@@ -112,7 +113,7 @@ Y_level1 = Y[level1_ix, ]
 
 dim(Y_level1)
 ```
-
+Only 53 members remain with these.
 
 ## Setup history matching limits
 
@@ -158,7 +159,10 @@ Y_target = matrix(Y_target, nrow = 1)
 ```
 
 
-```{r}
+## Augment the design.
+Choose a space-filling set of points that are Not Ruled Out Yet (NROY) according to the emulator.
+
+```{r, warning=FALSE, message=FALSE, results='hide'}
 # Final output needs to be expressed in terms of original LHS, then put back out to conf files.
 
 # This function adds n.aug potential design points, and finds their implausibility
@@ -220,61 +224,10 @@ write_jules_design(X_mm = X_mm, paramlist=paramlist, n = nrow(X_mm),
                     startnum = 100)
 ```
 
-```{r}
 
-
-
-
-
-
-```
-
-```{r}
-# Tighter restrictions on model outputs will lead to a smaller
-# Xnroy object, as more potential inputs are ruled out.
-dim(wave1$X_nroy)
-
-# Exclude any design points outside of the ranges returned as NROY
-keep1.ix = which(apply(X.level1, FUN = WithinRange,1,
-                      maxes = wave1$X.nroy.max,
-                      mins = wave1$X.nroy.min))
-
-X.keep1 = X.level1[keep1.ix, ]
-
-# choose the number of NROY design points that we require for the next wave
-# of model runs.
-n.app = 100
-
-# The ChooseMaximinNroy algorithm picks a matrix which has space filling properties
-X.aug1 = ChooseMaximinNroy(n.app = n.app, waveobj=wave1, nreps = 10000)
-
-
-X2 = rbind(X.keep1, X.aug1)
-
-# Express this matrix in terms of the original latin hypercube
-
-# Visualise the various design matrices.
-dev.new(width = 10, height = 10)
-pairs(X.keep1, gap = 0, xlim = c(0,1), ylim = c(0,1)
-)
-
-# Here is the new part of the design.
-# This has pleasing gaps with no design points, meaning we've ruled out parts of space.
-dev.new(width = 10, height = 10)
-pairs(X.aug1, gap = 0, xlim = c(0,1), ylim = c(0,1)
-)
-
-
-# end of analysis
-stop()
-
-```
 
 
 Many of the ensemble members are removed under this constraint, with only around 10% remaining.
-
-
-
 
 Vignettes are long form documentation commonly included in packages. Because they are part of the distribution of the package, they need to be as compact as possible. The `html_vignette` output type provides a custom style sheet (and tweaks some options) to ensure that the resulting html is as small as possible. The `html_vignette` format:
 
