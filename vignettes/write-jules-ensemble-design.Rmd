@@ -35,7 +35,7 @@ source('default_jules_parameter_perturbations.R')
 tf <- 'l_vg_soil'
 # we don't want anything that is TRUE/FALSE to be in fac
 fac.init <- names(paramlist)
-not_tf.ix <- which(names(paramlist)!=tf)
+not_tf.ix <- which(na mes(paramlist)!=tf)
 paramlist.trunc <-paramlist[not_tf.ix]
 
 fac <- names(paramlist.trunc)
@@ -53,7 +53,7 @@ confdir <- 'conf_files_example'
 dir.create(confdir)
 
 # This is the function that writes the configuration files.
-write_jules_design(paramlist, n = 100,
+write_jules_design(paramlist=paramlist, n = 100,
                     fac = fac, minfac = minfac, maxfac = maxfac,
                     tf = tf,
                     fnprefix = paste0(confdir,'/param-perturb-P'),

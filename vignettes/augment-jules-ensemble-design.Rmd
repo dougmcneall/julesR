@@ -1,15 +1,13 @@
 ---
 title: "Augment JULES ensemble design"
-author: "Doug McNeall"
-date: "`r Sys.Date()`"
 output: rmarkdown::html_vignette
 vignette: >
-  %\VignetteIndexEntry{Vignette Title}
+  %\VignetteIndexEntry{write-jules-ensemble-design}
   %\VignetteEngine{knitr::rmarkdown}
   %\VignetteEncoding{UTF-8}
 ---
 
-```{r setup, include = FALSE}
+```{r, include = FALSE}
 knitr::opts_chunk$set(
   collapse = TRUE,
   comment = "#>"
@@ -18,8 +16,9 @@ knitr::opts_chunk$set(
 
 The purpose of this vignette is to augment an ensemble of JULES with new ensemble members, with input parameter configurations where we think the model output will fall within a set of constraints. The code will write a new set of configuration files.
 
-```{r packages}
+```{r}
 
+library(DiceKriging)
 library(julesR)
 library(emtools)
 library(imptools)
@@ -31,53 +30,248 @@ library(viztools)
 
 
 ```{r}
- years = 1861:2014
- ysec = 60*60*24*365
- norm_vec = c(1e12, 1e12, 1e12/ysec , 1e12, 1e12, 1e9)
+years = 1861:2014
+ysec = 60*60*24*365
+norm_vec = c(1e12, 1e12, 1e12/ysec , 1e12, 1e12, 1e9)
  
- # Load up the data
- lhs_i = read.table('data/ES_PPE_i/lhs_u-ao732.txt', header = TRUE)
- lhs_ii = read.table('data/ES_PPE_ii/lhs_u-ao732a.txt', header = TRUE)
-# 
-# toplevel.ix = 1:499
-# 
-# lhs = rbind(lhs_i, lhs_ii)[toplevel.ix, ]
-# 
-# X = normalize(lhs)
-# colnames(X) = colnames(lhs)
-# d = ncol(X)
+# Load up the data
+# system.file find the specified file in package julesR
+lhs_i = read.table(system.file('extdata/lhs_u-ao732.txt', package = 'julesR'), header = TRUE)
+lhs_ii = read.table(system.file('extdata/lhs_u-ao732a.txt', package = 'julesR'), header = TRUE)
+ 
+toplevel_ix = 1:499
+ 
+lhs = rbind(lhs_i, lhs_ii)[toplevel_ix, ]
+ 
+X = normalize(lhs)
+colnames(X) = colnames(lhs)
+d = ncol(X)
 
+
+#dat <- read.csv(system.file('extdata/es_ppe_ii_annual_global_sum.csv', package = 'julesR'), header = TRUE)
+dat <- read.csv(file = '~/myRpackages/julesR/inst/extdata/es_ppe_ii_annual_global_sum.csv', header = TRUE)
+
+Y <- sweep(dat, 2, norm_vec, FUN = '/')
+p <- ncol(Y)
 
 ```
 
+## Level 0 constraint
 
-```{r, include=FALSE}
+The model is required to run, and have some sort of functioning carbon cycle.
 
-# --------------------------------------------------------------------------------
-# Level 0 constraint
-# Model runs and has some kind of carbon cycle
-# --------------------------------------------------------------------------------
+```{r, level 0 constraint}
+
+allix = 1:(nrow(Y)) # this could be replaced with toplevel_ix above
 
 # Constrain with global runoff and nbp, so that the emulator
 # is not negatively affected by really bad points
-# level0.ix = which(dat.norm[,'runoff'] >0.5 & dat.norm[,'nbp'] > -10)
+level0_ix = which(Y[,'runoff'] >0.5 & Y[,'nbp'] > -10)
 # 
-# dat.level0  = dat.norm[level0.ix, ]     # (scaled to sensible) data that passes level 0
-# X.level0 = X[level0.ix, ]               # Normalised inputs that pass level 0
-# lhs.level0 = lhs[level0.ix, ]           # Non-normalised inputs that pass level 0
+Y_level0  = Y[level0_ix, ]     # (scaled to sensible) data that passes level 0
+X_level0 = X[level0_ix, ]               # Normalised inputs that pass level 0
+lhs_level0 = lhs[level0_ix, ]           # Non-normalised inputs that pass level 0
 # 
-# nlevel0.ix = setdiff(allix, level0.ix)  # These inputs DO NOT PASS
-# X.nlevel0 = X[nlevel0.ix, ]
-# lhs.nlevel0 = lhs[nlevel0.ix, ]
-# 
-# # These are the ensemble members which do not run (produce NA)
-# na.ix = which(is.na(dat.norm[,'runoff']))
-# X.na = X[na.ix, ]
-# lhs.na = lhs[na.ix, ]
+nlevel0_ix = setdiff(allix, level0_ix)  # These inputs DO NOT PASS
+X_nlevel0 = X[nlevel0_ix, ]
+lhs_nlevel0 = lhs[nlevel0_ix, ]
+#  
+# These are the ensemble members which do not run (produce NA)
+na_ix = which(is.na(Y[,'runoff']))
+X_na = X[na_ix, ]
+lhs_na = lhs[na_ix, ]
+
+dim(Y_level0)
+```
+
+
+## Level 1 constraint
+
+The model has a carbon cycle which is constrained to within broad ranges of a number of important outputs.
+
+```{r}
+
+# Apply level 1 constraints
+level1_ix = which(Y[,'cs_gb'] > 750 & Y[,'cs_gb'] < 3000 &
+  Y[,'cv'] > 300 & Y[,'cv'] < 800 & 
+  Y[,'npp_n_gb'] > 35 &
+  Y[,'npp_n_gb'] < 80 &
+  Y[,'runoff'] >0.5 &
+  Y[,'nbp'] > -10
+  )
+
+X_level1 = X[level1_ix, ]
+
+# Ranges of the inputs after a level 1 constraint
+rn_l1 = apply(X_level1, 2, range)
+
+nlevel1_ix = setdiff(allix, level1_ix)
+X_nlevel1 = X[nlevel1_ix, ]
+
+Y_level1 = Y[level1_ix, ]
+
+dim(Y_level1)
+```
+
+
+## Setup history matching limits
+
+```{r}
+# In order to use the history matching code, we'll need to specify targets -
+# specifically "observations" with uncertainty thatapproximately match our
+# "hard boundaries" from the existing constraints.
+
+# Initial guess just choose the centre of the (implied) uniform distribution.
+#cs_gb.target = (3000 - 750) / 2
+#cv.target = (800 - 300) / 2
+#npp_n_gb.target = (80 - 35) / 2
+#runoff.target = 1
+#nbp.target = 0
+#gpp.target = 75
+
+#Y.target = c(cs_gb.target, cv.target, npp_n_gb.target, runoff.target, nbp.target)
+
+# I'm going to set it so that +3sd aligns approximately with the original limits
+# given by Andy Wiltshire.
+#cs_gb       cv    gpp_gb        nbp npp_n_gb    runoff
+Y_lower = c(750, 300, 50, -10, 35, 0.5)
+Y_upper = c(3000, 800,200, 10, 80, 1.5)
+Y_target = (Y_upper - abs(Y_lower)) / 2 # abs() to fix the problem with negative numbers
+
+
+# standard deviation is derived from the limits and the central target
+# (this distance is assumed to be 3 standard deviations.
+Y_sd = (Y_upper - Y_target) / 3
+names(Y_sd) = colnames(Y)
+
+obs_sd_list = as.list(rep(0.01,p))
+disc_list =  as.list(rep(0,p)) 
+disc_sd_list =  as.list(Y_sd/2)
+thres = 3
+
+mins_aug = apply(X_level1, 2, FUN = min)
+maxes_aug =apply(X_level1, 2, FUN = max)
+
+# convert Y_target for ingestion into function
+Y_target = matrix(Y_target, nrow = 1)
+
+```
+
+
+```{r}
+# Final output needs to be expressed in terms of original LHS, then put back out to conf files.
+
+# This function adds n.aug potential design points, and finds their implausibility
+# score in X.nroy
+
+wave1 = addNroyDesignPoints(X = X_level1, 
+                            Y = Y_level1, 
+                            Y_target = Y_target,
+                            n_aug = 10000, 
+                            mins_aug = mins_aug,
+                            maxes_aug = maxes_aug,
+                            thres = 3,
+                            disc_list=disc_list,
+                            disc_sd_list = disc_sd_list,
+                            obs_sd_list = obs_sd_list,
+                            n_app = 20,
+                            nreps = 100)
+```
+
+
+
+```{r}
+source('default_jules_parameter_perturbations.R')
+
+# Easiest way to generate a design of the right size is to have a "fac" which takes
+# the names from the parameter list, and then multiplies everything by 0.5 or 2
+
+tf <- 'l_vg_soil'
+# we don't want anything that is TRUE/FALSE to be in fac
+fac.init <- names(paramlist)
+not_tf.ix <- which(names(paramlist)!=tf)
+paramlist.trunc <-paramlist[not_tf.ix]
+
+fac <- names(paramlist.trunc)
+
+maxfac <-lapply(paramlist.trunc,function(x) x$max[which.max(x$max)] / x$standard[which.max(x$max)])
+minfac <- lapply(paramlist.trunc,function(x) x$min[which.max(x$max)] / x$standard[which.max(x$max)])
+
+```
+
+
+```{r}
+# create a directory for the configuration files
+confdir <- 'conf_files_augment'
+
+dir.create(confdir)
+
+X_mm = wave1$X_mm
+
+# This is the function that writes the configuration files.
+write_jules_design(X_mm = X_mm, paramlist=paramlist, n = nrow(X_mm),
+                    fac = fac, minfac = minfac, maxfac = maxfac,
+                    tf = tf,
+                    fnprefix = paste0(confdir,'/param-perturb-P'),
+                    lhsfn = paste0(confdir,'/lhs_example.txt'),
+                    stanfn = paste0(confdir,'/stanparms_example.txt'),
+                    allstanfn = paste0(confdir,'/allstanparms_example.txt'),
+                    rn = 12,
+                    startnum = 100)
+```
+
+```{r}
+
+
+
+
 
 
 ```
 
+```{r}
+# Tighter restrictions on model outputs will lead to a smaller
+# Xnroy object, as more potential inputs are ruled out.
+dim(wave1$X_nroy)
+
+# Exclude any design points outside of the ranges returned as NROY
+keep1.ix = which(apply(X.level1, FUN = WithinRange,1,
+                      maxes = wave1$X.nroy.max,
+                      mins = wave1$X.nroy.min))
+
+X.keep1 = X.level1[keep1.ix, ]
+
+# choose the number of NROY design points that we require for the next wave
+# of model runs.
+n.app = 100
+
+# The ChooseMaximinNroy algorithm picks a matrix which has space filling properties
+X.aug1 = ChooseMaximinNroy(n.app = n.app, waveobj=wave1, nreps = 10000)
+
+
+X2 = rbind(X.keep1, X.aug1)
+
+# Express this matrix in terms of the original latin hypercube
+
+# Visualise the various design matrices.
+dev.new(width = 10, height = 10)
+pairs(X.keep1, gap = 0, xlim = c(0,1), ylim = c(0,1)
+)
+
+# Here is the new part of the design.
+# This has pleasing gaps with no design points, meaning we've ruled out parts of space.
+dev.new(width = 10, height = 10)
+pairs(X.aug1, gap = 0, xlim = c(0,1), ylim = c(0,1)
+)
+
+
+# end of analysis
+stop()
+
+```
+
+
+Many of the ensemble members are removed under this constraint, with only around 10% remaining.
 
 
 

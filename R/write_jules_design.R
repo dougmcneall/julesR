@@ -3,6 +3,7 @@
 #' This code writes a design taking either a 'factor', min and max by which to multiply all pfts,
 #' or perturbing each pft individually according to their maximum and minimum in the parameter list.
 #'
+#' @param X_mm augnmented design from addNroyDesignPoint
 #' @param paramlist character vector of chosen parameters
 #' @param n number of ensemble members
 #' @param fac  character vector of names of variables that you would like to alter by a factor. Everything else gets variaed by PFT
@@ -21,7 +22,7 @@
 #'
 #'
 #' @import emtools lhs MASS
-write_jules_design <- function(paramlist, n, fac, minfac, maxfac, tf, fnprefix = 'param-perturb-test',
+write_jules_design <- function(X_mm = NULL, paramlist, n, fac, minfac, maxfac, tf, fnprefix = 'param-perturb-test',
                                lhsfn = 'lhs.txt',stanfn = 'stanparms.txt', allstanfn = 'allstanparms.txt', rn = 5, startnum=0){
   # This code writes a design taking either a 'factor', min and max by which
   # to multiply all pfts, or perturbing each pft individually according to
@@ -82,6 +83,17 @@ write_jules_design <- function(paramlist, n, fac, minfac, maxfac, tf, fnprefix =
 
   write.matrix(standard_matrix_all, file = allstanfn)
 
+  if(!is.null(X_mm)){
+    lhs <- unnormalize(
+      X_mm,
+      un_mins <- c(parampft_mins , minfac, rep(0, length(tf)), recursive = TRUE),
+      un_maxes <- c(parampft_maxes, maxfac, rep(1, length(tf)), recursive = TRUE)
+    )
+    colnames(lhs) <- all_names
+  }
+
+  else{
+
   # Do the pfts and then the factors and then the logical
   lhs <- unnormalize(
     maximinLHS(n = n, k = k, dup = 1),
@@ -89,6 +101,7 @@ write_jules_design <- function(paramlist, n, fac, minfac, maxfac, tf, fnprefix =
     un_maxes <- c(parampft_maxes, maxfac, rep(1, length(tf)), recursive = TRUE)
   )
   colnames(lhs) <- all_names
+  }
 
   for(i in 1:nrow(lhs)){
     fn <- paste0(fnprefix,sprintf("%04d",(startnum+i)-1),'.conf')
