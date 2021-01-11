@@ -119,7 +119,7 @@ Only 53 members remain with these.
 
 ```{r}
 # In order to use the history matching code, we'll need to specify targets -
-# specifically "observations" with uncertainty thatapproximately match our
+# specifically "observations" with uncertainty that approximately match our
 # "hard boundaries" from the existing constraints.
 
 # Initial guess just choose the centre of the (implied) uniform distribution.
@@ -160,7 +160,7 @@ Y_target = matrix(Y_target, nrow = 1)
 
 
 ## Augment the design.
-Choose a space-filling set of points that are Not Ruled Out Yet (NROY) according to the emulator.
+The function addNroyDesignPoints builds an emulator for each model output in Y. It compares the output of each emulator at a number of candidate desin points, and chooses a space-filling set of them that that are Not Ruled Out Yet (statistically close to the observation at Y_target).
 
 ```{r, warning=FALSE, message=FALSE, results='hide'}
 # Final output needs to be expressed in terms of original LHS, then put back out to conf files.
@@ -204,6 +204,9 @@ minfac <- lapply(paramlist.trunc,function(x) x$min[which.max(x$max)] / x$standar
 ```
 
 
+## Write the augmented design
+The function write_jules_design here simply takes the points calculated by addNroyDesignPoints and writes them to configuration files.
+
 ```{r}
 # create a directory for the configuration files
 confdir <- 'conf_files_augment'
@@ -228,51 +231,3 @@ write_jules_design(X_mm = X_mm, paramlist=paramlist, n = nrow(X_mm),
 
 
 Many of the ensemble members are removed under this constraint, with only around 10% remaining.
-
-Vignettes are long form documentation commonly included in packages. Because they are part of the distribution of the package, they need to be as compact as possible. The `html_vignette` output type provides a custom style sheet (and tweaks some options) to ensure that the resulting html is as small as possible. The `html_vignette` format:
-
-- Never uses retina figures
-- Has a smaller default figure size
-- Uses a custom CSS stylesheet instead of the default Twitter Bootstrap style
-
-## Vignette Info
-
-Note the various macros within the `vignette` section of the metadata block above. These are required in order to instruct R how to build the vignette. Note that you should change the `title` field and the `\VignetteIndexEntry` to match the title of your vignette.
-
-## Styles
-
-The `html_vignette` template includes a basic CSS theme. To override this theme you can specify your own CSS in the document metadata as follows:
-
-    output: 
-      rmarkdown::html_vignette:
-        css: mystyles.css
-
-## Figures
-
-The figure sizes have been customised so that you can easily put two images side-by-side. 
-
-```{r, fig.show='hold'}
-plot(1:10)
-plot(10:1)
-```
-
-You can enable figure captions by `fig_caption: yes` in YAML:
-
-    output:
-      rmarkdown::html_vignette:
-        fig_caption: yes
-
-Then you can use the chunk option `fig.cap = "Your figure caption."` in **knitr**.
-
-## More Examples
-
-You can write math expressions, e.g. $Y = X\beta + \epsilon$, footnotes^[A footnote here.], and tables, e.g. using `knitr::kable()`.
-
-```{r, echo=FALSE, results='asis'}
-knitr::kable(head(mtcars, 10))
-```
-
-Also a quote using `>`:
-
-> "He who gives up [code] safety for [code] speed deserves neither."
-([via](https://twitter.com/hadleywickham/status/504368538874703872))

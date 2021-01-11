@@ -5,6 +5,7 @@
 \title{Create an ensemble design for jules}
 \usage{
 write_jules_design(
+  X_mm = NULL,
   paramlist,
   n,
   fac,
@@ -20,6 +21,8 @@ write_jules_design(
 )
 }
 \arguments{
+\item{X_mm}{augnmented design from addNroyDesignPoint}
+
 \item{paramlist}{character vector of chosen parameters}
 
 \item{n}{number of ensemble members}
