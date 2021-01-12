@@ -178,7 +178,7 @@ wave1 = addNroyDesignPoints(X = X_level1,
                             disc_list=disc_list,
                             disc_sd_list = disc_sd_list,
                             obs_sd_list = obs_sd_list,
-                            n_app = 20,
+                            n_app = 50,
                             nreps = 100)
 ```
 
@@ -229,5 +229,27 @@ write_jules_design(X_mm = X_mm, paramlist=paramlist, n = nrow(X_mm),
 
 
 
+## Check the design
+Check that the augmented design produces what we want.
 
-Many of the ensemble members are removed under this constraint, with only around 10% remaining.
+```{r, fig.width = 15, fig.height = 15}
+
+pairs(rbind(X, X_mm), xlim = c(0,1), ylim = c(0,1), gap = 0, lower.panel = NULL, 
+      col = c(rep('grey', nrow(X)), rep('red', nrow(X_mm))),
+      pch = c(rep(21, nrow(X)), rep(20, nrow(X_mm)))
+      )
+
+par(xpd = NA)
+
+legend('bottom',
+       legend = c('Original design', 'New points'),
+       col = c('grey', 'red'),
+       inset = 0.15,
+       cex = 1.5,
+       pch = c(21,20)
+)
+
+```
+
+
+
