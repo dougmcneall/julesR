@@ -230,7 +230,7 @@ write_jules_design(X_mm = X_mm, paramlist=paramlist, n = nrow(X_mm),
 
 
 ## Check the design
-Check that the augmented design produces what we want.
+Check that the augmented design produces what we expect. New ensemble members should be somewhat constrained within the boundaries of the original design, if the comparison to data offers any constraint.
 
 ```{r, fig.width = 15, fig.height = 15}
 
